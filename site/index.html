@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <!-- Страница которая отображает кнопку входа, название сервера и количество людей на сервере
+     Измените title и переменную baseAPI -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>НАЗВАНИЕ ВАШЕГО СЕРВЕРА</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #0a1929;
+            color: #e9ecef;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .card {
+            background: linear-gradient(145deg, #102a43, #0a2239);
+            border: 1px solid #1e5cb3;
+            border-radius: 15px;
+            box-shadow: 0 0 30px rgba(30, 92, 179, 0.4);
+            width: 100%;
+            max-width: 800px;
+            padding: 2.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            min-height: 420px;
+            display: flex;
+            align-items: center;
+        }
+
+        #serverName {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+            opacity: 0;
+            height: 0;
+            overflow: hidden;
+        }
+
+        #serverName.visible {
+            opacity: 1;
+            height: auto;
+            margin-bottom: 1.5rem;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 0 70px rgba(30, 92, 179, 0.6);
+        }
+
+        .card-title {
+            font-size: 1.8rem;
+            margin-bottom: 1.5rem;
+            color: #4cc9f0;
+            font-weight: 600;
+        }
+
+        .button-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 1.5rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(to right, #1e5cb3, #4cc9f0);
+            border: none;
+            border-radius: 50px;
+            padding: 12px 30px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-top: 1.5rem;
+            transition: all 0.5s ease;
+            box-shadow: 0 4px 15px rgba(30, 92, 179, 0.5);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 50px rgba(30, 92, 179, 0.7);
+        }
+        
+        #statusText {
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 1.5rem 0;
+            font-size: 1.2rem;
+            line-height: 1.6;
+        }
+
+        #countPlayers {
+            font-size: 1.3rem;
+            color: #4cc9f0;
+            font-weight: 600;
+        }
+        
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+            margin-bottom: 1.5rem;
+            color: #4cc9f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title" id="serverName"></h5>
+            <h6 id="countPlayers"></h6>
+
+            <div id="statusText">Загружаем ссылку для входа на сервер</div>
+            <div class="spinner-border" role="status" id="spinner"></div>
+            <div class="button-container">
+                <button id="connectButton" class="btn btn-primary d-none">Войти на сервер</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async function() {
+            const baseAPI = 'https://URL-ВАШЕГО-API';
+
+            const serverName = document.getElementById('serverName');
+            const countPlayers = document.getElementById('countPlayers');
+            const statusText = document.getElementById('statusText');
+            const connectButton = document.getElementById('connectButton');
+            const spinner = document.getElementById('spinner')
+
+            let pollingTimeout;
+            let serverLink = '';
+            let serverInfo = {name: '', count_players: 0}
+
+            async function getServerInfo(){
+              try {
+                let response = await fetch(`${baseAPI}/info`)
+
+                if (response.status === 200) {
+                  return await response.json()
+                } else {
+                  throw new Error(`Ошибка сервера: ${response.status}`)
+                }
+              } catch (error) {
+                statusText.textContent = `Ошибка при получении ссылки на сервер: ${error.message}`;
+                console.error('Ошибка при запросе информации:', error);
+              }
+            }
+
+            async function pollServer() {
+                try {
+                    const response = await fetch(`${baseAPI}/server_link`);
+                    
+                    if (response.status === 200) {
+                        const data = await response.json();
+                        serverLink = data.link;
+                        statusText.innerHTML = 'Запустите Squad и нажмите "Войти" для подключения к серверу';
+                        connectButton.classList.remove('d-none');
+                        spinner.classList.add('visually-hidden')
+
+                        window.location.href = serverLink;
+                    } else if (response.status === 418) {
+                        console.log('Ждём ссылку...');
+                        pollingTimeout = setTimeout(pollServer, 3000);
+
+                    } else {
+                        throw new Error(`Ошибка сервера: ${response.status}`);
+                    }
+                } catch (error) {
+                    if (error.message.includes('Failed to fetch')) {
+                        statusText.textContent = 'Ошибка сети. Проверьте подключение к интернету.';
+                    } else {
+                        statusText.textContent = `Ошибка при получении ссылки на сервер: ${error.message}`;
+                    }
+                    console.error('Ошибка при опросе сервера:', error);
+
+                    pollingTimeout = setTimeout(pollServer, 3000);
+                }
+            }
+
+            connectButton.addEventListener('click', function() {
+                if (serverLink) {
+                    window.location.href = serverLink;
+                }
+            });
+            
+            let newServerInfo = await getServerInfo();
+
+            if (newServerInfo) {
+                serverInfo = newServerInfo
+            }
+
+            serverName.textContent = serverInfo.name
+            serverName.classList.add('visible');
+            countPlayers.textContent = `${serverInfo.count_players} / 100`
+            
+            await pollServer();
+        });
+    </script>
+</body>
+</html>
